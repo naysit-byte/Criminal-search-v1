@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#0a0f1e" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="กฎหมายอาญา" />
+  <meta name="description" content="ระบบสืบค้นประมวลกฎหมายอาญาไทย พร้อม AI ช่วยวิเคราะห์" />
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
+  <title>ระบบประมวลกฎหมายอาญา</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root {
+      height: 100%; width: 100%; overflow: hidden;
+      background: #0a0f1e; font-family: 'Sarabun', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #1e2d3d; border-radius: 4px; }
+    input, textarea, button { font-family: 'Sarabun', sans-serif; }
+    @keyframes pulse { 0%,100%{transform:scale(0.8);opacity:.4} 50%{transform:scale(1.1);opacity:1} }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+
+  <script type="text/babel">
+const { useState, useMemo, useRef, useEffect } = React;
+
+// ── DATA ──────────────────────────────────────────────────────────────────────
+const LAW_DATA = [
+  { id:1,  section:59,  category:"ความผิดทั่วไป",            subcategory:"เจตนา",               title:"เจตนาในการกระทำความผิด",       content:"บุคคลจะต้องรับผิดในทางอาญาก็ต่อเมื่อได้กระทำโดยเจตนา เว้นแต่จะได้กระทำโดยประมาท ในกรณีที่กฎหมายบัญญัติให้ต้องรับผิดเมื่อได้กระทำโดยประมาท หรือเว้นแต่ในกรณีที่กฎหมายบัญญัติไว้โดยแจ้งชัดให้ต้องรับผิดแม้ได้กระทำโดยไม่มีเจตนา", basis:"ความรับผิดทางอาญา", prison:"-", fine:"-", prescription:"-", keywords:["เจตนา","ประมาท","ความผิด"] },
+  { id:2,  section:80,  category:"ความผิดทั่วไป",            subcategory:"พยายาม",               title:"ผู้พยายามกระทำความผิด",         content:"ผู้ใดลงมือกระทำความผิดแต่กระทำไปไม่ตลอด หรือกระทำไปตลอดแล้วแต่การกระทำนั้นไม่บรรลุผล ผู้นั้นพยายามกระทำความผิด ต้องระวางโทษสองในสามส่วนของโทษที่กฎหมายกำหนดไว้สำหรับความผิดนั้น", basis:"พยายามกระทำความผิด", prison:"2/3 ของโทษสูงสุด", fine:"2/3 ของโทษสูงสุด", prescription:"-", keywords:["พยายาม","ลงมือ","ไม่บรรลุผล"] },
+  { id:3,  section:83,  category:"ความผิดทั่วไป",            subcategory:"ผู้ร่วมกระทำ",         title:"ผู้ร่วมกระทำความผิด",           content:"ถ้าบุคคลตั้งแต่สองคนขึ้นไปร่วมกันกระทำความผิด ให้ถือว่าต่างคนต่างกระทำความผิด ถ้าความผิดนั้นได้กระทำโดยมีการตระเตรียมหรือโดยมีการสมคบกัน ผู้ร่วมกระทำความผิดต้องระวางโทษสูงขึ้นอีกกึ่งหนึ่ง", basis:"ร่วมกระทำความผิด", prison:"เพิ่มกึ่งหนึ่ง", fine:"เพิ่มกึ่งหนึ่ง", prescription:"-", keywords:["ร่วมกระทำ","สมคบ","ตระเตรียม"] },
+  { id:4,  section:135, category:"ความผิดต่อรัฐ",            subcategory:"ความมั่นคง",           title:"ก่อการร้าย",                    content:"ผู้ใดกระทำการอันเป็นความผิดฐานก่อการร้าย ต้องระวางโทษประหารชีวิต จำคุกตลอดชีวิต หรือจำคุกตั้งแต่สิบห้าปีถึงยี่สิบปี", basis:"ก่อการร้าย", prison:"15-20 ปี / ตลอดชีวิต / ประหาร", fine:"-", prescription:"ไม่มีอายุความ", keywords:["ก่อการร้าย","ความมั่นคง","รัฐ"] },
+  { id:5,  section:157, category:"ความผิดต่อตำแหน่งหน้าที่",subcategory:"เจ้าพนักงาน",          title:"เจ้าพนักงานปฏิบัติหน้าที่มิชอบ", content:"ผู้ใดเป็นเจ้าพนักงาน ปฏิบัติหรือละเว้นการปฏิบัติหน้าที่โดยมิชอบ เพื่อให้เกิดความเสียหายแก่ผู้หนึ่งผู้ใด หรือปฏิบัติหรือละเว้นการปฏิบัติหน้าที่โดยทุจริต ต้องระวางโทษจำคุกตั้งแต่หนึ่งปีถึงสิบปี หรือปรับตั้งแต่สองหมื่นบาทถึงสองแสนบาท", basis:"เจ้าพนักงานปฏิบัติหน้าที่มิชอบ", prison:"1-10 ปี", fine:"20,000-200,000 บาท", prescription:"15 ปี", keywords:["157","เจ้าพนักงาน","ทุจริต","ละเว้น"] },
+  { id:6,  section:264, category:"ความผิดเกี่ยวกับเอกสาร",  subcategory:"ปลอมแปลง",             title:"ปลอมเอกสาร",                    content:"ผู้ใดทำเอกสารปลอมขึ้นทั้งฉบับหรือแต่ส่วนหนึ่งส่วนใด เติมหรือตัดทอนข้อความหรือแก้ไขด้วยประการใดๆ ในเอกสารที่แท้จริง โดยประการที่น่าจะเกิดความเสียหายแก่ผู้อื่น ต้องระวางโทษจำคุกไม่เกินสามปี หรือปรับไม่เกินหกหมื่นบาท", basis:"ปลอมเอกสาร", prison:"ไม่เกิน 3 ปี", fine:"ไม่เกิน 60,000 บาท", prescription:"10 ปี", keywords:["ปลอมเอกสาร","264","เอกสาร","ปลอม"] },
+  { id:7,  section:277, category:"ความผิดเกี่ยวกับเพศ",     subcategory:"ข่มขืน",               title:"ข่มขืนกระทำชำเรา",              content:"ผู้ใดข่มขืนกระทำชำเราผู้อื่น โดยขู่เข็ญด้วยประการใดๆ โดยใช้กำลังประทุษร้าย หรือโดยผู้อื่นนั้นอยู่ในภาวะที่ไม่สามารถขัดขืนได้ ต้องระวางโทษจำคุกตั้งแต่สี่ปีถึงยี่สิบปี และปรับตั้งแต่แปดหมื่นบาทถึงสี่แสนบาท", basis:"ข่มขืนกระทำชำเรา", prison:"4-20 ปี", fine:"80,000-400,000 บาท", prescription:"20 ปี", keywords:["277","ข่มขืน","ชำเรา","กำลังประทุษร้าย"] },
+  { id:8,  section:288, category:"ความผิดต่อชีวิต",          subcategory:"ฆ่าผู้อื่น",           title:"ฆ่าผู้อื่น",                    content:"ผู้ใดฆ่าผู้อื่น ต้องระวางโทษประหารชีวิต จำคุกตลอดชีวิต หรือจำคุกตั้งแต่สิบห้าปีถึงยี่สิบปี", basis:"ฆ่าผู้อื่น", prison:"15-20 ปี / ตลอดชีวิต / ประหาร", fine:"-", prescription:"20 ปี", keywords:["288","ฆ่า","ชีวิต","ประหาร"] },
+  { id:9,  section:289, category:"ความผิดต่อชีวิต",          subcategory:"ฆ่าโดยเหตุฉกรรจ์",    title:"ฆ่าโดยเหตุฉกรรจ์",             content:"ผู้ใดกระทำความผิดฐานฆ่าผู้อื่น โดยไตร่ตรองไว้ก่อน โดยทรมานหรือโดยกระทำทารุณโหดร้าย เพื่อตระเตรียมการหรือเพื่อความสะดวกในการกระทำความผิดอย่างอื่น ต้องระวางโทษประหารชีวิต", basis:"ฆ่าโดยเหตุฉกรรจ์", prison:"ประหารชีวิต", fine:"-", prescription:"ไม่มีอายุความ", keywords:["289","ฆ่า","ไตร่ตรอง","ทารุณ","ฉกรรจ์"] },
+  { id:10, section:295, category:"ความผิดต่อร่างกาย",         subcategory:"ทำร้ายร่างกาย",        title:"ทำร้ายร่างกาย",                 content:"ผู้ใดทำร้ายผู้อื่น จนเป็นเหตุให้เกิดอันตรายแก่กายหรือจิตใจของผู้อื่นนั้น ผู้นั้นกระทำความผิดฐานทำร้ายร่างกาย ต้องระวางโทษจำคุกไม่เกินสองปี หรือปรับไม่เกินสี่หมื่นบาท", basis:"ทำร้ายร่างกาย", prison:"ไม่เกิน 2 ปี", fine:"ไม่เกิน 40,000 บาท", prescription:"10 ปี", keywords:["295","ทำร้าย","ร่างกาย","อันตราย"] },
+  { id:11, section:297, category:"ความผิดต่อร่างกาย",         subcategory:"ทำร้ายร่างกายสาหัส",  title:"ทำร้ายร่างกายสาหัส",            content:"ผู้ใดกระทำความผิดฐานทำร้ายร่างกาย จนเป็นเหตุให้ผู้ถูกทำร้ายรับอันตรายสาหัส ต้องระวางโทษจำคุกตั้งแต่หกเดือนถึงสิบปี และปรับตั้งแต่หนึ่งหมื่นบาทถึงสองแสนบาท", basis:"ทำร้ายร่างกายสาหัส", prison:"6 เดือน - 10 ปี", fine:"10,000-200,000 บาท", prescription:"15 ปี", keywords:["297","สาหัส","ทำร้าย","อันตรายสาหัส"] },
+  { id:12, section:309, category:"ความผิดต่อเสรีภาพ",         subcategory:"หน่วงเหนี่ยว",         title:"หน่วงเหนี่ยวกักขัง",            content:"ผู้ใดหน่วงเหนี่ยวหรือกักขังผู้อื่น หรือกระทำด้วยประการใดให้ผู้อื่นปราศจากเสรีภาพในร่างกาย ต้องระวางโทษจำคุกไม่เกินสามปี หรือปรับไม่เกินหกหมื่นบาท", basis:"หน่วงเหนี่ยวกักขัง", prison:"ไม่เกิน 3 ปี", fine:"ไม่เกิน 60,000 บาท", prescription:"10 ปี", keywords:["309","หน่วงเหนี่ยว","กักขัง","เสรีภาพ"] },
+  { id:13, section:326, category:"ความผิดต่อชื่อเสียง",       subcategory:"หมิ่นประมาท",          title:"หมิ่นประมาท",                   content:"ผู้ใดใส่ความผู้อื่นต่อบุคคลที่สาม โดยประการที่น่าจะทำให้ผู้อื่นนั้นเสียชื่อเสียง ถูกดูหมิ่น หรือถูกเกลียดชัง ต้องระวางโทษจำคุกไม่เกินหนึ่งปี หรือปรับไม่เกินสองหมื่นบาท", basis:"หมิ่นประมาท", prison:"ไม่เกิน 1 ปี", fine:"ไม่เกิน 20,000 บาท", prescription:"3 เดือน", keywords:["326","หมิ่นประมาท","ใส่ความ","ชื่อเสียง"] },
+  { id:14, section:334, category:"ความผิดต่อทรัพย์",          subcategory:"ลักทรัพย์",            title:"ลักทรัพย์",                     content:"ผู้ใดเอาทรัพย์ของผู้อื่น หรือที่ผู้อื่นเป็นเจ้าของรวมอยู่ด้วยไปโดยทุจริต ผู้นั้นกระทำความผิดฐานลักทรัพย์ ต้องระวางโทษจำคุกไม่เกินสามปี และปรับไม่เกินหกหมื่นบาท", basis:"ลักทรัพย์", prison:"ไม่เกิน 3 ปี", fine:"ไม่เกิน 60,000 บาท", prescription:"10 ปี", keywords:["334","ลักทรัพย์","ทุจริต","เอาทรัพย์"] },
+  { id:15, section:335, category:"ความผิดต่อทรัพย์",          subcategory:"ลักทรัพย์ฉกรรจ์",     title:"ลักทรัพย์โดยเหตุฉกรรจ์",        content:"ผู้ใดกระทำความผิดฐานลักทรัพย์ในเวลากลางคืน หรือในที่หรือโดยวิธีอื่น ต้องระวางโทษจำคุกตั้งแต่หนึ่งปีถึงห้าปี และปรับตั้งแต่สองหมื่นบาทถึงหนึ่งแสนบาท", basis:"ลักทรัพย์โดยเหตุฉกรรจ์", prison:"1-5 ปี", fine:"20,000-100,000 บาท", prescription:"10 ปี", keywords:["335","ลักทรัพย์","กลางคืน","ฉกรรจ์"] },
+  { id:16, section:339, category:"ความผิดต่อทรัพย์",          subcategory:"ชิงทรัพย์",            title:"ชิงทรัพย์",                     content:"ผู้ใดลักทรัพย์โดยใช้กำลังประทุษร้าย หรือขู่เข็ญว่าในทันใดนั้นจะใช้กำลังประทุษร้าย ต้องระวางโทษจำคุกตั้งแต่ห้าปีถึงสิบปี และปรับตั้งแต่หนึ่งแสนบาทถึงสองแสนบาท", basis:"ชิงทรัพย์", prison:"5-10 ปี", fine:"100,000-200,000 บาท", prescription:"15 ปี", keywords:["339","ชิงทรัพย์","กำลังประทุษร้าย","ขู่เข็ญ"] },
+  { id:17, section:340, category:"ความผิดต่อทรัพย์",          subcategory:"ปล้นทรัพย์",           title:"ปล้นทรัพย์",                    content:"ผู้ใดชิงทรัพย์โดยมีอาวุธ หรือโดยใช้ยานพาหนะ ต้องระวางโทษจำคุกตั้งแต่สิบปีถึงสิบห้าปี และปรับตั้งแต่สองแสนบาทถึงสามแสนบาท ถ้าเป็นเหตุให้ผู้อื่นรับอันตรายสาหัส จำคุก 15-20 ปี", basis:"ปล้นทรัพย์", prison:"10-15 ปี (ถึง 20 ปี ถ้าสาหัส)", fine:"200,000-300,000 บาท", prescription:"20 ปี", keywords:["340","ปล้น","อาวุธ","ยานพาหนะ"] },
+  { id:18, section:341, category:"ความผิดต่อทรัพย์",          subcategory:"ฉ้อโกง",               title:"ฉ้อโกง",                        content:"ผู้ใดโดยทุจริต หลอกลวงผู้อื่นด้วยการแสดงข้อความอันเป็นเท็จ หรือปกปิดข้อความจริงซึ่งควรบอกให้แจ้ง และได้ไปซึ่งทรัพย์สินจากผู้ถูกหลอกลวง ต้องระวางโทษจำคุกไม่เกินสามปี หรือปรับไม่เกินหกหมื่นบาท", basis:"ฉ้อโกง", prison:"ไม่เกิน 3 ปี", fine:"ไม่เกิน 60,000 บาท", prescription:"10 ปี", keywords:["341","ฉ้อโกง","หลอกลวง","ทุจริต"] },
+  { id:19, section:352, category:"ความผิดต่อทรัพย์",          subcategory:"ยักยอก",               title:"ยักยอกทรัพย์",                  content:"ผู้ใดครอบครองทรัพย์ซึ่งเป็นของผู้อื่น เบียดบังเอาทรัพย์นั้นเป็นของตนหรือบุคคลที่สามโดยทุจริต ต้องระวางโทษจำคุกไม่เกินสามปี หรือปรับไม่เกินหกหมื่นบาท", basis:"ยักยอกทรัพย์", prison:"ไม่เกิน 3 ปี", fine:"ไม่เกิน 60,000 บาท", prescription:"10 ปี", keywords:["352","ยักยอก","เบียดบัง","ครอบครอง"] },
+  { id:20, section:358, category:"ความผิดต่อทรัพย์",          subcategory:"ทำให้เสียทรัพย์",      title:"ทำให้เสียทรัพย์",               content:"ผู้ใดทำให้เสียหาย ทำลาย ทำให้เสื่อมค่าหรือทำให้ไร้ประโยชน์ซึ่งทรัพย์ของผู้อื่น ต้องระวางโทษจำคุกไม่เกินสามปี หรือปรับไม่เกินหกหมื่นบาท", basis:"ทำให้เสียทรัพย์", prison:"ไม่เกิน 3 ปี", fine:"ไม่เกิน 60,000 บาท", prescription:"10 ปี", keywords:["358","ทำให้เสียทรัพย์","ทำลาย","ทรัพย์"] },
+];
+
+const CATEGORIES = ["ทั้งหมด", ...new Set(LAW_DATA.map(l => l.category))];
+const CAT_ICONS = {"ความผิดทั่วไป":"📋","ความผิดต่อรัฐ":"🏛️","ความผิดต่อตำแหน่งหน้าที่":"👮","ความผิดเกี่ยวกับเอกสาร":"📄","ความผิดเกี่ยวกับเพศ":"🔴","ความผิดต่อชีวิต":"💀","ความผิดต่อร่างกาย":"🩹","ความผิดต่อเสรีภาพ":"⛓️","ความผิดต่อชื่อเสียง":"💬","ความผิดต่อทรัพย์":"💰"};
+const C = {bg:"#0a0f1e",surface:"#111827",border:"#1e2d3d",gold:"#d4af37",goldDim:"rgba(212,175,55,0.15)",text:"#e2e8f0",muted:"#64748b",subtle:"#94a3b8",danger:"#dc2626",info:"#3b82f6",purple:"#8b5cf6"};
+
+const penaltyLevel = p => {
+  if (!p||p==="-") return 0;
+  if (p.includes("ประหาร")||p.includes("ตลอดชีวิต")) return 5;
+  if (p.includes("15")||p.includes("20")) return 4;
+  if (p.includes("10")||p.includes("5")) return 3;
+  if (p.includes("3")||p.includes("4")) return 2;
+  return 1;
+};
+const penaltyColor = p => ["#64748b","#16a34a","#ca8a04","#ea580c","#dc2626","#7c3aed"][penaltyLevel(p)];
+const penaltyLabel = p => ["ไม่มีโทษจำคุก","โทษเบา","โทษปานกลาง","โทษหนัก","โทษสูงมาก","โทษสูงสุด"][penaltyLevel(p)];
+
+function PenaltyPill({prison}) {
+  const col = penaltyColor(prison);
+  return (
+    <span style={{display:"inline-flex",alignItems:"center",gap:3,background:`${col}18`,border:`1px solid ${col}44`,borderRadius:20,padding:"2px 8px",fontSize:11,color:col,fontWeight:700}}>
+      {[0,1,2,3,4].map(i=><span key={i} style={{width:5,height:5,borderRadius:"50%",background:i<penaltyLevel(prison)?col:C.border}}/>)}
+      <span style={{marginLeft:2}}>{prison!=="-"?prison:"ไม่มี"}</span>
+    </span>
+  );
+}
+
+function DetailPanel({law, onClose, onTagClick}) {
+  const related = LAW_DATA.filter(l=>l.id!==law.id&&l.category===law.category).slice(0,3);
+  return (
+    <div style={{flex:1,overflowY:"auto",padding:"16px"}}>
+      <button onClick={onClose} style={{background:"none",border:"none",color:C.muted,fontSize:13,cursor:"pointer",marginBottom:14,padding:0,display:"flex",alignItems:"center",gap:4}}>← กลับ</button>
+      <div style={{background:C.surface,borderRadius:12,padding:16,marginBottom:12,border:`1px solid ${C.border}`}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:6}}>
+          <span style={{fontFamily:"monospace",fontSize:12,color:C.subtle}}>มาตรา {law.section}</span>
+          <span style={{display:"inline-block",padding:"2px 9px",borderRadius:20,border:`1px solid ${C.gold}55`,background:C.goldDim,color:C.gold,fontSize:11}}>{law.category}</span>
+        </div>
+        <div style={{fontSize:20,fontWeight:700,color:C.text,marginBottom:2}}>{law.title}</div>
+        <div style={{fontSize:12,color:C.muted}}>{law.subcategory}</div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>
+        {[{icon:"🔒",label:"โทษจำคุก",value:law.prison,color:penaltyColor(law.prison)},{icon:"💰",label:"โทษปรับ",value:law.fine!=="-"?law.fine:"ไม่มี",color:C.info},{icon:"⏱",label:"อายุความ",value:law.prescription||"-",color:C.purple}].map(({icon,label,value,color})=>(
+          <div key={label} style={{background:C.bg,borderRadius:10,padding:"10px 8px",border:`1px solid ${color}33`,textAlign:"center"}}>
+            <div style={{fontSize:16,marginBottom:3}}>{icon}</div>
+            <div style={{fontSize:9,color:C.muted,marginBottom:3,textTransform:"uppercase",letterSpacing:"0.06em"}}>{label}</div>
+            <div style={{fontSize:11,fontWeight:700,color,lineHeight:1.3}}>{value}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{background:C.surface,borderRadius:10,padding:"12px 14px",marginBottom:10,border:`1px solid ${C.border}`}}>
+        <div style={{fontSize:10,color:C.muted,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.08em"}}>ระดับความร้ายแรง · {penaltyLabel(law.prison)}</div>
+        <div style={{background:C.bg,borderRadius:4,height:8,overflow:"hidden"}}>
+          <div style={{width:`${penaltyLevel(law.prison)*20}%`,height:"100%",background:`linear-gradient(90deg,#16a34a,${penaltyColor(law.prison)})`,borderRadius:4}}/>
+        </div>
+      </div>
+      <div style={{background:C.surface,borderRadius:10,padding:"12px 14px",marginBottom:10,border:`1px solid ${C.border}`}}>
+        <div style={{fontSize:10,color:C.muted,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.08em"}}>📜 บทบัญญัติ</div>
+        <div style={{fontSize:13,color:C.text,lineHeight:1.8}}>{law.content}</div>
+      </div>
+      <div style={{background:C.surface,borderRadius:10,padding:"12px 14px",marginBottom:10,border:`1px solid ${C.border}`}}>
+        <div style={{fontSize:10,color:C.muted,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.08em"}}>🏷 คำสำคัญ</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+          {law.keywords.map(k=><span key={k} onClick={()=>onTagClick(k)} style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:6,padding:"3px 10px",fontSize:12,color:C.subtle,cursor:"pointer"}}>{k}</span>)}
+        </div>
+      </div>
+      {related.length>0&&<>
+        <div style={{fontSize:10,color:C.muted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>🔗 มาตราที่เกี่ยวข้อง</div>
+        {related.map(r=>(
+          <div key={r.id} style={{background:C.surface,borderRadius:8,padding:"10px 14px",marginBottom:8,border:`1px solid ${C.border}`}}>
+            <div style={{fontSize:11,color:C.muted,marginBottom:2}}>ม.{r.section}</div>
+            <div style={{fontSize:13,color:C.text}}>{r.title}</div>
+          </div>
+        ))}
+      </>}
+    </div>
+  );
+}
+
+function SearchTab() {
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState(null);
+  const [category, setCategory] = useState("ทั้งหมด");
+  const [focused, setFocused] = useState(false);
+  const results = useMemo(() => {
+    const q = query.toLowerCase().trim();
+    return LAW_DATA.filter(law => {
+      if (category!=="ทั้งหมด"&&law.category!==category) return false;
+      if (!q) return true;
+      return law.title.includes(q)||law.basis.includes(q)||String(law.section).includes(q)||law.keywords.some(k=>k.includes(q))||law.category.includes(q)||law.content.includes(q);
+    });
+  }, [query, category]);
+  useEffect(() => { if (selected&&!results.find(r=>r.id===selected.id)) setSelected(null); }, [results]);
+  const showDetail = !!selected;
+  return (
+    <div style={{display:"flex",flexDirection:"column",flex:1,overflow:"hidden"}}>
+      <div style={{padding:"12px 16px 0",background:C.surface,borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+        <div style={{position:"relative",marginBottom:10}}>
+          <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:15,pointerEvents:"none"}}>🔍</span>
+          <input style={{width:"100%",boxSizing:"border-box",background:C.bg,border:`2px solid ${focused?C.gold:C.border}`,borderRadius:10,padding:"9px 36px 9px 38px",fontSize:14,color:C.text,outline:"none",fontFamily:"'Sarabun',sans-serif",transition:"border-color 0.2s"}}
+            placeholder="ค้นหามาตรา ชื่อความผิด คำสำคัญ..."
+            value={query} onChange={e=>setQuery(e.target.value)}
+            onFocus={()=>setFocused(true)} onBlur={()=>setFocused(false)} />
+          {query&&<button onClick={()=>setQuery("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:C.border,border:"none",borderRadius:5,color:C.subtle,width:20,height:20,cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>}
+        </div>
+        <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:10,scrollbarWidth:"none"}}>
+          {CATEGORIES.map(cat=>{
+            const active=category===cat;
+            return <button key={cat} onClick={()=>setCategory(cat)} style={{flexShrink:0,padding:"4px 11px",borderRadius:20,border:`1px solid ${active?C.gold:C.border}`,background:active?C.goldDim:"transparent",color:active?C.gold:C.muted,fontSize:11,cursor:"pointer",whiteSpace:"nowrap",fontFamily:"'Sarabun',sans-serif"}}>{CAT_ICONS[cat]||"📌"} {cat}</button>;
+          })}
+        </div>
+      </div>
+      <div style={{display:"flex",flex:1,overflow:"hidden"}}>
+        <div style={{width:showDetail?"300px":"100%",flexShrink:0,overflowY:"auto",borderRight:showDetail?`1px solid ${C.border}`:"none"}}>
+          <div style={{padding:"6px 14px 2px",fontSize:11,color:C.muted}}>พบ <strong style={{color:C.text}}>{results.length}</strong> มาตรา{query&&<> · "<span style={{color:C.gold}}>{query}</span>"</>}</div>
+          {results.length===0
+            ? <div style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"50px 20px",color:C.muted,textAlign:"center"}}><div style={{fontSize:36,marginBottom:10}}>🔎</div><div style={{fontSize:14,color:C.subtle}}>ไม่พบผลลัพธ์</div></div>
+            : results.map(law=>{
+              const active=selected?.id===law.id;
+              return (
+                <div key={law.id} onClick={()=>setSelected(active?null:law)} style={{padding:"12px 16px",borderBottom:`1px solid ${C.border}`,borderLeft:`3px solid ${active?C.gold:"transparent"}`,background:active?"#1a2332":"transparent",cursor:"pointer"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:3}}>
+                    <span style={{fontSize:10,background:C.bg,border:`1px solid ${C.border}`,borderRadius:5,padding:"1px 6px",color:C.subtle,fontFamily:"monospace"}}>ม.{law.section}</span>
+                    <PenaltyPill prison={law.prison}/>
+                  </div>
+                  <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:2}}>{law.title}</div>
+                  <div style={{fontSize:11,color:C.muted}}>{CAT_ICONS[law.category]} {law.category}</div>
+                </div>
+              );
+            })}
+        </div>
+        {selected&&<DetailPanel law={selected} onClose={()=>setSelected(null)} onTagClick={t=>setQuery(t)}/>}
+      </div>
+    </div>
+  );
+}
+
+const QUICK_Q = ["ลักทรัพย์กับชิงทรัพย์ต่างกันอย่างไร?","โทษฐานฉ้อโกงคืออะไร?","อายุความฆ่าผู้อื่นกี่ปี?","มาตรา 157 คืออะไร?","การพยายามกระทำความผิดมีโทษอย่างไร?"];
+
+function AiTab() {
+  const [messages, setMessages] = useState([{role:"assistant",content:"สวัสดีครับ ผมเป็นผู้ช่วย AI สำหรับสืบค้นและวิเคราะห์ประมวลกฎหมายอาญาไทย ถามได้เลยครับ ⚖️"}]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const bottomRef = useRef(null);
+  useEffect(() => { bottomRef.current?.scrollIntoView({behavior:"smooth"}); }, [messages, loading]);
+
+  const lawSummary = LAW_DATA.map(l=>`ม.${l.section} ${l.title}: ${l.basis} จำคุก:${l.prison} ปรับ:${l.fine} อายุความ:${l.prescription}`).join("\n");
+
+  const send = async (text) => {
+    const msg = text||input.trim();
+    if (!msg||loading) return;
+    setInput("");
+    const newMessages = [...messages, {role:"user",content:msg}];
+    setMessages(newMessages);
+    setLoading(true);
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          model:"claude-sonnet-4-20250514", max_tokens:1000,
+          system:`คุณเป็นผู้เชี่ยวชาญประมวลกฎหมายอาญาไทย ตอบภาษาไทย กระชับ ชัดเจน ระบุมาตราที่เกี่ยวข้อง\nฐานข้อมูล:\n${lawSummary}\nคำเตือน: เป็นข้อมูลเบื้องต้น ควรปรึกษาทนายความสำหรับคดีจริง`,
+          messages: newMessages.map(m=>({role:m.role,content:m.content})),
+        }),
+      });
+      const data = await res.json();
+      const answer = data.content?.find(b=>b.type==="text")?.text||"ขออภัย ไม่สามารถตอบได้";
+      setMessages(prev=>[...prev,{role:"assistant",content:answer}]);
+    } catch { setMessages(prev=>[...prev,{role:"assistant",content:"⚠️ เกิดข้อผิดพลาด กรุณาลองใหม่"}]); }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",flex:1,overflow:"hidden"}}>
+      <div style={{flex:1,overflowY:"auto",padding:"16px"}}>
+        {messages.map((m,i)=>(
+          <div key={i} style={{display:"flex",gap:8,marginBottom:14,flexDirection:m.role==="user"?"row-reverse":"row",animation:"fadeIn 0.2s ease"}}>
+            <div style={{width:30,height:30,borderRadius:"50%",flexShrink:0,background:m.role==="user"?C.goldDim:"#1e3a5f",border:`1px solid ${m.role==="user"?C.gold+"44":C.info+"44"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>{m.role==="user"?"👤":"⚖️"}</div>
+            <div style={{maxWidth:"80%",background:m.role==="user"?C.goldDim:C.surface,border:`1px solid ${m.role==="user"?C.gold+"44":C.border}`,borderRadius:12,padding:"9px 13px",fontSize:13,color:C.text,lineHeight:1.7,whiteSpace:"pre-wrap"}}>{m.content}</div>
+          </div>
+        ))}
+        {loading&&(
+          <div style={{display:"flex",gap:8,marginBottom:14}}>
+            <div style={{width:30,height:30,borderRadius:"50%",background:"#1e3a5f",border:`1px solid ${C.info+"44"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>⚖️</div>
+            <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:"10px 14px",display:"flex",gap:5,alignItems:"center"}}>
+              {[0,1,2].map(i=><div key={i} style={{width:7,height:7,borderRadius:"50%",background:C.gold,animation:"pulse 1.2s ease-in-out infinite",animationDelay:`${i*0.2}s`}}/>)}
+            </div>
+          </div>
+        )}
+        <div ref={bottomRef}/>
+      </div>
+      {messages.length<=1&&(
+        <div style={{padding:"0 14px 10px",display:"flex",gap:6,overflowX:"auto",scrollbarWidth:"none"}}>
+          {QUICK_Q.map(q=><button key={q} onClick={()=>send(q)} style={{flexShrink:0,background:C.surface,border:`1px solid ${C.border}`,borderRadius:20,padding:"5px 11px",fontSize:11,color:C.subtle,cursor:"pointer",whiteSpace:"nowrap",fontFamily:"'Sarabun',sans-serif"}}>{q}</button>)}
+        </div>
+      )}
+      <div style={{padding:"10px 14px",background:C.surface,borderTop:`1px solid ${C.border}`,display:"flex",gap:8,alignItems:"flex-end"}}>
+        <textarea value={input} onChange={e=>setInput(e.target.value)}
+          onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
+          placeholder="ถามเกี่ยวกับกฎหมายอาญา..." rows={2}
+          style={{flex:1,background:C.bg,border:`1px solid ${C.border}`,borderRadius:10,padding:"8px 12px",fontSize:13,color:C.text,outline:"none",fontFamily:"'Sarabun',sans-serif",resize:"none",lineHeight:1.5}}/>
+        <button onClick={()=>send()} disabled={loading||!input.trim()} style={{background:loading||!input.trim()?C.border:C.gold,border:"none",borderRadius:10,width:40,height:40,cursor:loading||!input.trim()?"not-allowed":"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>➤</button>
+      </div>
+    </div>
+  );
+}
+
+function StatsTab() {
+  const catCounts = CATEGORIES.slice(1).map(cat=>({cat,count:LAW_DATA.filter(l=>l.category===cat).length,icon:CAT_ICONS[cat]||"📌"})).sort((a,b)=>b.count-a.count);
+  const maxCount = Math.max(...catCounts.map(c=>c.count));
+  const levelCounts = [1,2,3,4,5].map(level=>({level,label:["","โทษเบา","โทษปานกลาง","โทษหนัก","โทษสูงมาก","โทษสูงสุด"][level],count:LAW_DATA.filter(l=>penaltyLevel(l.prison)===level).length,color:penaltyColor(["","1 ปี","3 ปี","5 ปี","10 ปี","ประหาร"][level])}));
+  const total=LAW_DATA.length, withFine=LAW_DATA.filter(l=>l.fine!=="-").length, withPres=LAW_DATA.filter(l=>l.prescription!=="-"&&l.prescription!=="ไม่มีอายุความ").length, noPres=LAW_DATA.filter(l=>l.prescription==="ไม่มีอายุความ").length;
+  return (
+    <div style={{overflowY:"auto",padding:"16px"}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+        {[{icon:"📚",label:"มาตราทั้งหมด",value:total,color:C.gold},{icon:"💰",label:"มีโทษปรับ",value:withFine,color:C.info},{icon:"⏱",label:"มีอายุความ",value:withPres,color:C.purple},{icon:"♾️",label:"ไม่มีอายุความ",value:noPres,color:C.danger}].map(({icon,label,value,color})=>(
+          <div key={label} style={{background:C.surface,borderRadius:12,padding:"14px",border:`1px solid ${C.border}`,textAlign:"center"}}>
+            <div style={{fontSize:22,marginBottom:5}}>{icon}</div>
+            <div style={{fontSize:26,fontWeight:800,color,marginBottom:3}}>{value}</div>
+            <div style={{fontSize:11,color:C.muted}}>{label}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{background:C.surface,borderRadius:12,padding:"14px",marginBottom:14,border:`1px solid ${C.border}`}}>
+        <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:12}}>จำนวนมาตราตามหมวด</div>
+        {catCounts.map(({cat,count,icon})=>(
+          <div key={cat} style={{marginBottom:10}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+              <span style={{fontSize:11,color:C.subtle}}>{icon} {cat}</span>
+              <span style={{fontSize:11,fontWeight:700,color:C.text}}>{count}</span>
+            </div>
+            <div style={{background:C.bg,borderRadius:4,height:7,overflow:"hidden"}}>
+              <div style={{width:`${(count/maxCount)*100}%`,height:"100%",background:`linear-gradient(90deg,${C.gold}88,${C.gold})`,borderRadius:4}}/>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{background:C.surface,borderRadius:12,padding:"14px",border:`1px solid ${C.border}`}}>
+        <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:12}}>การกระจายระดับโทษ</div>
+        {levelCounts.map(({label,count,color,level})=>(
+          <div key={level} style={{display:"flex",alignItems:"center",gap:8,background:C.bg,borderRadius:8,padding:"9px 12px",marginBottom:8,border:`1px solid ${color}33`}}>
+            <div style={{display:"flex",gap:3}}>{[1,2,3,4,5].map(i=><div key={i} style={{width:7,height:7,borderRadius:"50%",background:i<=level?color:C.border}}/>)}</div>
+            <span style={{flex:1,fontSize:12,color:C.subtle}}>{label}</span>
+            <span style={{fontSize:13,fontWeight:700,color}}>{count}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const TABS = [{key:"search",icon:"🔍",label:"สืบค้น"},{key:"ai",icon:"🤖",label:"AI วิเคราะห์"},{key:"stats",icon:"📊",label:"สถิติ"}];
+
+function App() {
+  const [tab, setTab] = useState("search");
+  return (
+    <div style={{height:"100vh",display:"flex",flexDirection:"column",background:C.bg,fontFamily:"'Sarabun',sans-serif",color:C.text,overflow:"hidden"}}>
+      <div style={{background:C.surface,borderBottom:`1px solid ${C.border}`,padding:"12px 16px 0",flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+          <div style={{width:34,height:34,borderRadius:9,background:"linear-gradient(135deg,#d4af37,#b8860b)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>⚖️</div>
+          <div>
+            <div style={{fontSize:15,fontWeight:700,color:C.text}}>ระบบประมวลกฎหมายอาญา</div>
+            <div style={{fontSize:10,color:C.muted,letterSpacing:"0.05em",textTransform:"uppercase"}}>Thai Criminal Code · AI-Powered</div>
+          </div>
+        </div>
+        <div style={{display:"flex"}}>
+          {TABS.map(t=>{
+            const active=tab===t.key;
+            return <button key={t.key} onClick={()=>setTab(t.key)} style={{flex:1,padding:"6px 4px 10px",background:"none",border:"none",borderBottom:`2px solid ${active?C.gold:"transparent"}`,color:active?C.gold:C.muted,fontSize:11,fontWeight:active?700:400,cursor:"pointer",fontFamily:"'Sarabun',sans-serif",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+              <span style={{fontSize:15}}>{t.icon}</span><span>{t.label}</span>
+            </button>;
+          })}
+        </div>
+      </div>
+      <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+        {tab==="search"&&<SearchTab/>}
+        {tab==="ai"&&<AiTab/>}
+        {tab==="stats"&&<StatsTab/>}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+  </script>
+
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js")
+          .then(r => console.log("SW registered:", r.scope))
+          .catch(e => console.log("SW error:", e));
+      });
+    }
+  </script>
+</body>
+</html>
